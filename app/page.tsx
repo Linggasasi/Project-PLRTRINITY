@@ -3,10 +3,11 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
-import { Activity, Bot, BrainCircuit, ChevronRight, CircleDollarSign, Database, Gauge, Menu, Send, Shield, Sparkles, TrendingUp, X } from 'lucide-react';
+import { Activity, Bot, BrainCircuit, ChevronRight, CircleDollarSign, Clock3, Database, Gauge, Menu, Send, Shield, Sparkles, TrendingUp, X } from 'lucide-react';
 import { PeerRadarChart } from '@/components/charts/peer-radar-chart';
 import { AnomalyBadge } from '@/components/ui/anomaly-badge';
 import { PitchbookCard } from '@/components/ui/pitchbook-card';
+import { AuthButton } from '@/components/ui/auth-button';
 
 const chips = [
   'Bandingkan BBCA vs BMRI',
@@ -29,6 +30,7 @@ export default function HomePage() {
   const [input, setInput] = useState('');
   const [railOpen, setRailOpen] = useState(true);
   const [apiOk, setApiOk] = useState<boolean | null>(null);
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const [activeSection, setActiveSection] = useState('Terminal');
   const [directFundamentals, setDirectFundamentals] = useState<any>(null);
   const [directFundamentalsLoading, setDirectFundamentalsLoading] = useState(false);
@@ -41,6 +43,14 @@ export default function HomePage() {
       .catch(() => { if (active) setApiOk(false); });
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    const updateTime = () => setCurrentTime(new Date());
+    updateTime();
+    const interval = window.setInterval(updateTime, 1000);
+    return () => window.clearInterval(interval);
+  }, []);
+
   const { messages, sendMessage, status, error } = useChat({
     transport: new DefaultChatTransport({ api: '/api/chat' }),
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
@@ -92,8 +102,13 @@ export default function HomePage() {
             </div>
           </div>
           <div className="flex items-center gap-3 text-xs">
+            <time dateTime={currentTime?.toISOString()} className="hidden items-center gap-1.5 text-slate-400 md:flex" title="Waktu Jakarta">
+              <Clock3 className="h-3.5 w-3.5 text-emerald-400" />
+              {currentTime ? currentTime.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '--:--:--'} WIB
+            </time>
             <div className={`hidden items-center gap-2 rounded-full border px-3 py-1.5 md:flex ${apiOk ? 'border-emerald-400/20 bg-emerald-500/5 text-emerald-300' : 'border-amber-400/20 bg-amber-500/5 text-amber-200'}`}><span className={`h-2 w-2 rounded-full ${apiOk ? 'animate-pulse bg-emerald-400' : 'bg-amber-300'}`} />Sectors API {apiState}</div>
             <div className="hidden items-center gap-2 rounded-full border border-slate-800 bg-slate-900/60 px-3 py-1.5 text-slate-400 md:flex"><CircleDollarSign className="h-3.5 w-3.5" />IDX / JAKARTA</div>
+            <AuthButton />
           </div>
         </div>
       </header>
