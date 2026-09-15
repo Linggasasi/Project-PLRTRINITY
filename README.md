@@ -12,7 +12,7 @@ Institutional-style AI Financial Intelligence Platform for the Indonesia Stock E
 
 ## Run
 
-1. Copy `.env.example` to `.env.local` and fill both API keys.
+1. Copy `.env.example` to `.env.local` and fill the provider, database, and auth variables.
 2. Install dependencies with `npm install`.
 3. Start with `npm run dev`.
 
@@ -29,9 +29,21 @@ Sectors Financial API v1 was discontinued on 11 May 2026. This project keeps the
 
 All Sectors secrets stay server-side.
 
+## Vercel deployment
+
+Configure these variables in Vercel Project Settings -> Environment Variables for **Production** and **Preview**:
+
+- `NEXTAUTH_SECRET`: long random value, for example `openssl rand -base64 32`
+- `NEXTAUTH_URL`: the exact deployed URL, for example `https://your-project.vercel.app`
+- `DATABASE_URL`: a hosted PostgreSQL connection string. Do not use `file:./dev.db` on Vercel.
+- `SECTORS_API_KEY`
+- `GOOGLE_GENERATIVE_AI_API_KEY`
+
+After saving variables, redeploy the project. The local `.env.local` file is ignored by Git and is never uploaded to Vercel.
+
 ## Authentication
 
-The dashboard and data APIs require a session. Users can create an account at `/signup` and sign in at `/login`. Sessions use an httpOnly signed cookie, and passwords are stored as `scrypt` hashes in the local `.data/users.json` file for development.
+The dashboard and data APIs require a session. Users can create an account at `/signup` and sign in at `/login`. Sessions use NextAuth JWT cookies, and passwords are stored as `bcrypt` hashes in the Prisma `User` table.
 
-Set a long random `AUTH_SECRET` in `.env.local` before deploying. For production or multiple instances, replace the local `.data` store with a managed database because deployment filesystems may be ephemeral.
+Use a hosted PostgreSQL database for production. Vercel deployment filesystems are not a durable place to store SQLite or local user files.
 
