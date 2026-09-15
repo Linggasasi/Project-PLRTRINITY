@@ -349,7 +349,7 @@ export default function HomePage() {
             <textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); (e.currentTarget.form as HTMLFormElement)?.requestSubmit(); } }} rows={1} placeholder="Ask the CIO about an IDX ticker, valuation, peers, sentiment, or momentum…" className="min-h-12 flex-1 resize-none bg-transparent px-3 py-3 text-sm text-white outline-none placeholder:text-slate-600" />
             <button type="submit" disabled={!input.trim() || isLoading} className="flex h-12 items-center gap-2 rounded-xl bg-emerald-500 px-4 text-sm font-bold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"><Send className="h-4 w-4" />{isLoading ? 'Analyzing' : 'Send'}</button>
           </form>
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-1 text-[10px] uppercase tracking-widest text-slate-600"><span>Data is retrieved from Sectors API · AI outputs are analytical, not financial advice.</span><span>Sectors API v2 · Gemini</span></div>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-1 text-[10px] uppercase tracking-widest text-slate-600"><span>Data is retrieved from Sectors API · AI outputs are analytical, not financial advice.</span><span>Sectors API v2 · OpenAI</span></div>
         </div>
       </div>
     </main>

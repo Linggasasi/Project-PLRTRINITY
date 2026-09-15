@@ -5,7 +5,7 @@ Institutional-style AI Financial Intelligence Platform for the Indonesia Stock E
 ## Stack
 
 - Next.js App Router + TypeScript
-- Vercel AI SDK + Google Gemini
+- Vercel AI SDK + OpenAI
 - Sectors Financial API (v2)
 - Recharts + Lucide React
 - Tailwind CSS
@@ -37,7 +37,7 @@ Configure these variables in Vercel Project Settings -> Environment Variables fo
 - `NEXTAUTH_URL`: the exact deployed URL, for example `https://your-project.vercel.app`
 - `DATABASE_URL`: a hosted PostgreSQL connection string for production. XAMPP/phpMyAdmin uses MySQL and is not compatible with this schema.
 - `SECTORS_API_KEY`
-- `GOOGLE_GENERATIVE_AI_API_KEY`
+- `OPENAI_API_KEY`
 
 After saving variables, run `npx prisma db push` once with the production `DATABASE_URL`, then redeploy the project. The local `.env.local` file is ignored by Git and is never uploaded to Vercel.
 
