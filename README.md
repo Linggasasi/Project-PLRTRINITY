@@ -39,7 +39,7 @@ Configure these variables in Vercel Project Settings -> Environment Variables fo
 - `SECTORS_API_KEY`
 - `GOOGLE_GENERATIVE_AI_API_KEY`
 
-After saving variables, redeploy the project. The local `.env.local` file is ignored by Git and is never uploaded to Vercel.
+After saving variables, run `npx prisma db push` once with the production `DATABASE_URL`, then redeploy the project. The local `.env.local` file is ignored by Git and is never uploaded to Vercel.
 
 ## Authentication
 
