@@ -29,3 +29,9 @@ Sectors Financial API v1 was discontinued on 11 May 2026. This project keeps the
 
 All Sectors secrets stay server-side.
 
+## Authentication
+
+The dashboard and data APIs require a session. Users can create an account at `/signup` and sign in at `/login`. Sessions use an httpOnly signed cookie, and passwords are stored as `scrypt` hashes in the local `.data/users.json` file for development.
+
+Set a long random `AUTH_SECRET` in `.env.local` before deploying. For production or multiple instances, replace the local `.data` store with a managed database because deployment filesystems may be ephemeral.
+

@@ -3,8 +3,9 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
-import { Activity, Bot, BrainCircuit, ChevronRight, CircleDollarSign, Database, Gauge, Menu, Send, Shield, Sparkles, TrendingUp, X } from 'lucide-react';
+import { Activity, Bookmark, Bot, BrainCircuit, ChevronRight, CircleDollarSign, Database, Download, Gauge, Menu, RefreshCw, Send, Shield, Sparkles, Trash2, TrendingUp, X } from 'lucide-react';
 import { PeerRadarChart } from '@/components/charts/peer-radar-chart';
+import { MomentumChart } from '@/components/charts/momentum-chart';
 import { AnomalyBadge } from '@/components/ui/anomaly-badge';
 import { PitchbookCard } from '@/components/ui/pitchbook-card';
 
@@ -25,6 +26,8 @@ const promptBySection: Record<string, string> = {
   'Risk & Alerts': 'Cari risk dan anomaly terbaru BBCA',
 };
 
+type SavedAnalysis = { id: string; ticker: string; type: string; savedAt: string; payload: unknown };
+
 export default function HomePage() {
   const [input, setInput] = useState('');
   const [railOpen, setRailOpen] = useState(true);
@@ -32,6 +35,16 @@ export default function HomePage() {
   const [activeSection, setActiveSection] = useState('Terminal');
   const [directFundamentals, setDirectFundamentals] = useState<any>(null);
   const [directFundamentalsLoading, setDirectFundamentalsLoading] = useState(false);
+  const [ticker, setTicker] = useState('BBCA');
+  const [momentumData, setMomentumData] = useState<any>(null);
+  const [momentumLoading, setMomentumLoading] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [savedAnalyses, setSavedAnalyses] = useState<SavedAnalysis[]>([]);
+
+  async function logout() {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.assign('/login');
+  }
 
   useEffect(() => {
     let active = true;
@@ -41,6 +54,14 @@ export default function HomePage() {
       .catch(() => { if (active) setApiOk(false); });
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    try {
+      setSavedAnalyses(JSON.parse(localStorage.getItem('idx-sentinel-saved-analyses') ?? '[]'));
+    } catch {
+      setSavedAnalyses([]);
+    }
+  }, []);
   const { messages, sendMessage, status, error } = useChat({
     transport: new DefaultChatTransport({ api: '/api/chat' }),
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
@@ -48,12 +69,72 @@ export default function HomePage() {
 
   const isLoading = status === 'submitted' || status === 'streaming';
 
+  function saveAnalysis(type: string, payload: unknown) {
+    const next = [{ id: `${Date.now()}`, ticker, type, savedAt: new Date().toISOString(), payload }, ...savedAnalyses].slice(0, 12);
+    setSavedAnalyses(next);
+    localStorage.setItem('idx-sentinel-saved-analyses', JSON.stringify(next));
+  }
+
+  function exportAnalysis(item: SavedAnalysis) {
+    const blob = new Blob([JSON.stringify(item, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${item.ticker}-${item.type.toLowerCase().replaceAll(' ', '-')}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function clearSavedAnalyses() {
+    setSavedAnalyses([]);
+    localStorage.removeItem('idx-sentinel-saved-analyses');
+  }
+
+  async function fetchFundamentals(nextTicker = ticker) {
+    setDirectFundamentalsLoading(true);
+    try {
+      const response = await fetch('/api/fundamentals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticker: nextTicker }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      setDirectFundamentals(data);
+      setLastUpdated(new Date().toISOString());
+      saveAnalysis('Fundamentals', data);
+    } catch (requestError) {
+      setDirectFundamentals({ error: requestError instanceof Error ? requestError.message : 'Fundamentals unavailable.' });
+    } finally {
+      setDirectFundamentalsLoading(false);
+    }
+  }
+
+  async function fetchMomentum(nextTicker = ticker) {
+    setMomentumLoading(true);
+    try {
+      const response = await fetch('/api/momentum', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticker: nextTicker }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      setMomentumData(data);
+      setLastUpdated(data.fetchedAt);
+    } catch (requestError) {
+      setMomentumData({ error: requestError instanceof Error ? requestError.message : 'Momentum unavailable.' });
+    } finally {
+      setMomentumLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (activeSection !== 'Momentum') return;
+    void fetchMomentum(ticker);
+    const interval = window.setInterval(() => void fetchMomentum(ticker), 30_000);
+    return () => window.clearInterval(interval);
+  }, [activeSection, ticker]);
+
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     const value = input.trim();
     if (!value || isLoading) return;
     if (value.toLowerCase().includes('fundamental')) {
-      runPrompt(value);
+      void fetchFundamentals(ticker);
+      setActiveSection('Fundamentals');
       setInput('');
       return;
     }
@@ -63,18 +144,21 @@ export default function HomePage() {
 
   function runPrompt(prompt: string) {
     if (isLoading) return;
+    const promptTicker = prompt.toUpperCase().match(/\b[A-Z]{4}\b/)?.[0];
+    const activeTicker = promptTicker ?? ticker;
+    if (promptTicker) setTicker(promptTicker);
     if (prompt.toLowerCase().includes('fundamental')) {
       setActiveSection('Fundamentals');
-      setDirectFundamentalsLoading(true);
-      fetch('/api/fundamentals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticker: 'BBCA' }) })
-        .then((response) => response.json().then((data) => ({ ok: response.ok, data })))
-        .then(({ ok, data }) => { if (!ok) throw new Error(data.error); setDirectFundamentals(data); })
-        .catch((requestError) => setDirectFundamentals({ error: requestError instanceof Error ? requestError.message : 'Fundamentals unavailable.' }))
-        .finally(() => setDirectFundamentalsLoading(false));
+      void fetchFundamentals(activeTicker);
       return;
     }
-    setActiveSection(prompt.toLowerCase().includes('momentum') ? 'Momentum' : 'Terminal');
-    void sendMessage({ text: prompt });
+    if (prompt.toLowerCase().includes('momentum')) {
+      setActiveSection('Momentum');
+      void fetchMomentum(activeTicker);
+      return;
+    }
+    setActiveSection('Terminal');
+    void sendMessage({ text: prompt.replaceAll('BBCA', activeTicker) });
   }
 
   const apiState = apiOk == null ? 'CHECKING' : apiOk ? 'LIVE' : 'CONFIG REQUIRED';
@@ -94,12 +178,13 @@ export default function HomePage() {
           <div className="flex items-center gap-3 text-xs">
             <div className={`hidden items-center gap-2 rounded-full border px-3 py-1.5 md:flex ${apiOk ? 'border-emerald-400/20 bg-emerald-500/5 text-emerald-300' : 'border-amber-400/20 bg-amber-500/5 text-amber-200'}`}><span className={`h-2 w-2 rounded-full ${apiOk ? 'animate-pulse bg-emerald-400' : 'bg-amber-300'}`} />Sectors API {apiState}</div>
             <div className="hidden items-center gap-2 rounded-full border border-slate-800 bg-slate-900/60 px-3 py-1.5 text-slate-400 md:flex"><CircleDollarSign className="h-3.5 w-3.5" />IDX / JAKARTA</div>
+            <button type="button" onClick={logout} className="rounded-lg border border-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-400 hover:border-red-400/30 hover:text-red-200">Logout</button>
           </div>
         </div>
       </header>
 
       <div className="mx-auto grid max-w-[1600px] grid-cols-1 md:grid-cols-[250px_minmax(0,1fr)]">
-        <aside className={`${railOpen ? 'block' : 'hidden'} border-r border-slate-800/70 bg-slate-950/55 p-4 md:block`}>
+        <aside className={`${railOpen ? 'block' : 'hidden'} border-r border-slate-800/70 bg-slate-950/55 p-4 md:sticky md:top-16 md:block md:h-[calc(100vh-4rem)] md:self-start md:overflow-y-auto`}>
           <div className="space-y-2">
             {[
               ['Terminal', Gauge],
@@ -156,6 +241,13 @@ export default function HomePage() {
 
             <div className="glass mb-4 rounded-2xl p-3">
               <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500"><Sparkles className="h-3.5 w-3.5 text-emerald-400" />Quick prompts</div>
+              <div className="mt-3 flex flex-wrap items-center gap-2 border-b border-slate-800 pb-3">
+                <label className="text-xs font-semibold text-slate-400" htmlFor="ticker">Ticker</label>
+                <input id="ticker" value={ticker} onChange={(event) => setTicker(event.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6))} onKeyDown={(event) => { if (event.key === 'Enter') void fetchFundamentals(); }} placeholder="BBCA" className="w-24 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm font-bold tracking-wider text-white outline-none focus:border-emerald-400" />
+                <button type="button" onClick={() => { setActiveSection('Fundamentals'); void fetchFundamentals(); }} disabled={!ticker || directFundamentalsLoading} className="rounded-lg border border-emerald-400/30 px-3 py-2 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-40">Analyze</button>
+                <button type="button" onClick={() => { setActiveSection('Momentum'); void fetchMomentum(); }} disabled={!ticker || momentumLoading} className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 hover:border-emerald-400/30 disabled:opacity-40"><RefreshCw className={`mr-1 inline h-3.5 w-3.5 ${momentumLoading ? 'animate-spin' : ''}`} />Refresh tape</button>
+                {lastUpdated ? <span className="text-[10px] uppercase tracking-widest text-slate-600">Updated {new Date(lastUpdated).toLocaleTimeString('id-ID')}</span> : null}
+              </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 {chips.map((chip) => <button key={chip} onClick={() => runPrompt(chip)} disabled={isLoading} className="rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1.5 text-xs font-medium text-slate-400 transition hover:border-emerald-400/30 hover:text-emerald-300 disabled:cursor-not-allowed disabled:opacity-40">{chip}</button>)}
               </div>
@@ -203,6 +295,11 @@ export default function HomePage() {
               {directFundamentals?.error ? <div className="rounded-2xl border border-amber-400/25 bg-amber-500/10 p-4 text-sm text-amber-100">Fundamentals belum tersedia: {directFundamentals.error}</div> : null}
               {directFundamentals?.metrics ? <PitchbookCard ticker={directFundamentals.ticker} company={directFundamentals.company} metrics={directFundamentals.metrics} /> : null}
 
+              {activeSection === 'Momentum' && momentumData?.error ? <div className="rounded-2xl border border-amber-400/25 bg-amber-500/10 p-4 text-sm text-amber-100">Momentum belum tersedia: {momentumData.error}</div> : null}
+              {activeSection === 'Momentum' && momentumData?.momentum ? <div className="space-y-4"><div className="glass rounded-2xl p-4"><div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div><div className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-400">Live Sectors Tape</div><div className="mt-1 text-lg font-semibold text-white">{momentumData.ticker} · Technical Momentum</div><div className="text-xs text-slate-500">Polling every 30 seconds · {new Date(momentumData.fetchedAt).toLocaleString('id-ID')}</div></div><AnomalyBadge multiple={momentumData.momentum.volumeMultiple} date={momentumData.momentum.date} /><button type="button" onClick={() => saveAnalysis('Momentum', momentumData)} className="rounded-lg border border-slate-700 p-2 text-slate-400 hover:text-emerald-300" title="Save momentum analysis"><Bookmark className="h-4 w-4" /></button></div><div className="grid grid-cols-2 gap-2 text-xs md:grid-cols-4">{[['Close', momentumData.momentum.latestClose], ['SMA 20', momentumData.momentum.sma20], ['SMA 50', momentumData.momentum.sma50], ['Volume vs 10D', momentumData.momentum.volumeMultiple ? `${momentumData.momentum.volumeMultiple.toFixed(2)}x` : '—']].map(([label, value]) => <div key={label as string} className="rounded-xl border border-slate-800 bg-slate-950/70 p-3"><div className="text-slate-500">{label}</div><div className="mt-1 font-semibold text-slate-200">{typeof value === 'number' ? value.toLocaleString('id-ID') : value}</div></div>)}</div></div><MomentumChart series={momentumData.series} /></div> : null}
+
+              {savedAnalyses.length ? <section className="glass rounded-2xl p-4"><div className="mb-3 flex items-center justify-between"><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-slate-400"><Bookmark className="h-3.5 w-3.5 text-emerald-400" />Saved analyses</div><button type="button" onClick={clearSavedAnalyses} className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-slate-600 hover:text-red-300"><Trash2 className="h-3.5 w-3.5" />Clear</button></div><div className="grid gap-2 md:grid-cols-2">{savedAnalyses.map((item) => <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2"><div><div className="text-xs font-semibold text-slate-300">{item.ticker} · {item.type}</div><div className="text-[10px] text-slate-600">{new Date(item.savedAt).toLocaleString('id-ID')}</div></div><button type="button" onClick={() => exportAnalysis(item)} className="rounded-lg p-2 text-slate-500 hover:text-emerald-300" title="Export analysis"><Download className="h-4 w-4" /></button></div>)}</div></section> : null}
+
               {messages.map((message) => (
                 <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`${message.role === 'user' ? 'max-w-2xl rounded-2xl border border-emerald-400/15 bg-emerald-500/10' : 'w-full'} p-4`}>
@@ -243,7 +340,7 @@ export default function HomePage() {
             <textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); (e.currentTarget.form as HTMLFormElement)?.requestSubmit(); } }} rows={1} placeholder="Ask the CIO about an IDX ticker, valuation, peers, sentiment, or momentum…" className="min-h-12 flex-1 resize-none bg-transparent px-3 py-3 text-sm text-white outline-none placeholder:text-slate-600" />
             <button type="submit" disabled={!input.trim() || isLoading} className="flex h-12 items-center gap-2 rounded-xl bg-emerald-500 px-4 text-sm font-bold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"><Send className="h-4 w-4" />{isLoading ? 'Analyzing' : 'Send'}</button>
           </form>
-          <div className="mt-2 flex items-center justify-between px-1 text-[10px] uppercase tracking-widest text-slate-600"><span>AI outputs are analytical, not financial advice.</span><span>Sectors API v2 · Gemini</span></div>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-1 text-[10px] uppercase tracking-widest text-slate-600"><span>Data is retrieved from Sectors API · AI outputs are analytical, not financial advice.</span><span>Sectors API v2 · Gemini</span></div>
         </div>
       </div>
     </main>
