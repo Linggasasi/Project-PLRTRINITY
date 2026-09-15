@@ -33,6 +33,7 @@ export default function HomePage() {
   const [input, setInput] = useState('');
   const [railOpen, setRailOpen] = useState(true);
   const [apiOk, setApiOk] = useState<boolean | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const [activeSection, setActiveSection] = useState('Terminal');
   const [directFundamentals, setDirectFundamentals] = useState<any>(null);
@@ -47,8 +48,8 @@ export default function HomePage() {
     let active = true;
     fetch('/api/health')
       .then((response) => response.json())
-      .then((data) => { if (active) setApiOk(Boolean(data.ok)); })
-      .catch(() => { if (active) setApiOk(false); });
+      .then((data) => { if (active) { setApiOk(Boolean(data.ok)); setApiError(data.error ?? null); } })
+      .catch(() => { if (active) { setApiOk(false); setApiError('Health check unavailable.'); } });
     return () => { active = false; };
   }, []);
 
@@ -165,7 +166,7 @@ export default function HomePage() {
     void sendMessage({ text: prompt.replaceAll('BBCA', activeTicker) });
   }
 
-  const apiState = apiOk == null ? 'CHECKING' : apiOk ? 'LIVE' : 'CONFIG REQUIRED';
+  const apiState = apiOk == null ? 'CHECKING' : apiOk ? 'LIVE' : apiError?.includes('SUBSCRIPTION_DOES_NOT_ALLOW') ? 'SUBSCRIPTION LIMITED' : 'CONFIG REQUIRED';
 
   return (
     <main className="min-h-screen bg-slate-950 bg-radial-grid bg-[size:22px_22px]">
