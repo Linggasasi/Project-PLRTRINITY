@@ -29,7 +29,7 @@ Sectors Financial API v1 was discontinued on 11 May 2026. This project keeps the
 
 All Sectors secrets stay server-side.
 
-## Vercel deployment
+to## Vercel deployment
 
 Configure these variables in Vercel Project Settings -> Environment Variables for **Production** and **Preview**:
 
