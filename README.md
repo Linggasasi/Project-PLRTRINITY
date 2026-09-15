@@ -35,7 +35,7 @@ Configure these variables in Vercel Project Settings -> Environment Variables fo
 
 - `NEXTAUTH_SECRET`: long random value, for example `openssl rand -base64 32`
 - `NEXTAUTH_URL`: the exact deployed URL, for example `https://your-project.vercel.app`
-- `DATABASE_URL`: a hosted PostgreSQL connection string. Do not use `file:./dev.db` on Vercel.
+- `DATABASE_URL`: a hosted PostgreSQL connection string for production. XAMPP/phpMyAdmin uses MySQL and is not compatible with this schema.
 - `SECTORS_API_KEY`
 - `GOOGLE_GENERATIVE_AI_API_KEY`
 
