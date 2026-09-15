@@ -1,4 +1,4 @@
-import { openai } from '@ai-sdk/openai';
+import { google } from '@ai-sdk/google';
 import { convertToModelMessages, stepCountIs, streamText, tool, type UIMessage } from 'ai';
 import { z } from 'zod';
 import { calculateFundamentals, analyzeMomentum, extractPeerRows, sentimentFromNews } from '@/lib/analysis';
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
     const modelMessages = await convertToModelMessages(messages);
 
     const result = streamText({
-      model: openai('gpt-4o-mini'),
+      model: google(process.env.GEMINI_MODEL || 'gemini-2.5-flash'),
       system: SYSTEM_PROMPT,
       messages: modelMessages,
       temperature: 0.15,
