@@ -4,7 +4,8 @@ import { z } from 'zod';
 import { calculateFundamentals, analyzeMomentum, extractPeerRows, sentimentFromNews } from '@/lib/analysis';
 import { runCioScan } from '@/lib/orchestrator';
 import { getCompanyFinancials, getDailyTransaction, getLatestNews, getSectorPeers } from '@/lib/sectors';
-import { requireSession } from '@/lib/auth';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/auth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -36,7 +37,7 @@ const tickerSchema = z.object({
 
 export async function POST(req: Request) {
   try {
-    await requireSession();
+    if (!(await getServerSession(authOptions))) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
     const { messages }: { messages: UIMessage[] } = await req.json();
     const modelMessages = await convertToModelMessages(messages);
 
@@ -135,7 +136,6 @@ export async function POST(req: Request) {
 
     return result.toUIMessageStreamResponse();
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
     console.error(error);
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), {
       status: 500,

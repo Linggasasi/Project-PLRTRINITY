@@ -1,15 +1,29 @@
-import { createUser, setSession } from '@/lib/auth';
+import bcrypt from 'bcryptjs';
+import { z } from 'zod';
+import { prisma } from '@/lib/prisma';
+
+const signupSchema = z.object({
+  name: z.string().trim().min(2).max(80),
+  email: z.string().trim().email().transform((value) => value.toLowerCase()),
+  password: z.string().min(8).max(72),
+});
 
 export async function POST(request: Request) {
   try {
-    const { name, email, password } = await request.json();
-    if (typeof name !== 'string' || name.trim().length < 2) return Response.json({ error: 'Nama minimal 2 karakter.' }, { status: 400 });
-    if (typeof email !== 'string' || !email.includes('@')) return Response.json({ error: 'Email tidak valid.' }, { status: 400 });
-    if (typeof password !== 'string' || password.length < 8) return Response.json({ error: 'Password minimal 8 karakter.' }, { status: 400 });
-    const user = await createUser(name, email, password);
-    await setSession(user);
-    return Response.json({ user: { name: user.name, email: user.email } }, { status: 201 });
+    const input = signupSchema.parse(await request.json());
+    const existingUser = await prisma.user.findUnique({ where: { email: input.email } });
+    if (existingUser) return Response.json({ error: 'Email sudah terdaftar.' }, { status: 409 });
+
+    const passwordHash = await bcrypt.hash(input.password, 12);
+    await prisma.user.create({
+      data: { name: input.name, email: input.email, passwordHash },
+    });
+
+    return Response.json({ ok: true }, { status: 201 });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : 'Signup gagal.' }, { status: 400 });
+    if (error instanceof z.ZodError) {
+      return Response.json({ error: 'Nama, email, atau password tidak valid.' }, { status: 400 });
+    }
+    return Response.json({ error: 'Pendaftaran gagal. Coba lagi.' }, { status: 500 });
   }
 }
