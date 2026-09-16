@@ -48,7 +48,7 @@ export default function HomePage() {
     let active = true;
     fetch('/api/health')
       .then((response) => response.json())
-      .then((data) => { if (active) { setApiOk(Boolean(data.ok)); setApiError(data.error ?? null); } })
+      .then((data) => { if (active) { setApiOk(Boolean(data.ok || data.configured)); setApiError(data.error ?? null); } })
       .catch(() => { if (active) { setApiOk(false); setApiError('Health check unavailable.'); } });
     return () => { active = false; };
   }, []);

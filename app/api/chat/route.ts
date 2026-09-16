@@ -1,4 +1,9 @@
-import { openai } from '@ai-sdk/openai';
+import { createOpenAI } from '@ai-sdk/openai';
+
+const customOpenAI = createOpenAI({
+  baseURL: process.env.OPENAI_BASE_URL || 'https://core.snifoxai.com/v1',
+  apiKey: process.env.OPENAI_API_KEY,
+});
 import { convertToModelMessages, stepCountIs, streamText, tool, type UIMessage } from 'ai';
 import { z } from 'zod';
 import { calculateFundamentals, analyzeMomentum, extractPeerRows, sentimentFromNews } from '@/lib/analysis';
@@ -42,8 +47,8 @@ export async function POST(req: Request) {
     const modelMessages = await convertToModelMessages(messages);
 
     const result = streamText({
-      model: openai('gpt-4o-mini'),
-      system: SYSTEM_PROMPT,
+      model: customOpenAI.chat(process.env.OPENAI_MODEL || 'gpt-4o-mini'),
+    system: SYSTEM_PROMPT,
       messages: modelMessages,
       temperature: 0.15,
       maxRetries: 0,

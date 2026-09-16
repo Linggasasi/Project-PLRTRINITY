@@ -56,8 +56,8 @@ async function sectorsFetch<T extends Json>(path: string, init?: RequestInit): P
     const response = await fetch(`${BASE_URL}${path}`, {
       ...init,
       headers: {
-        Authorization: getApiKey(),
-        Accept: 'application/json',
+        'Authorization': getApiKey(), // Diubah dari 'X-API-KEY' menjadi 'Authorization'
+        'Accept': 'application/json',
         ...(init?.headers ?? {}),
       },
       cache: 'no-store',
@@ -112,8 +112,19 @@ export async function getDailyTransaction(ticker: string, days = 60) {
   const start = new Date(end);
   start.setDate(start.getDate() - Math.min(Math.max(days, 10), 90));
   const fmt = (d: Date) => d.toISOString().slice(0, 10);
-  const data = await sectorsFetch<DailyTransaction[]>(`/v2/daily/${encodeURIComponent(t)}/?start=${fmt(start)}&end=${fmt(end)}`);
-  return data;
+  
+  const rawData = await sectorsFetch<Json>(
+    `/v2/daily/${encodeURIComponent(t)}/?start=${fmt(start)}&end=${fmt(end)}`
+  );
+
+  if (Array.isArray(rawData)) {
+    return rawData as DailyTransaction[];
+  }
+  if (rawData && typeof rawData === 'object' && 'data' in rawData && Array.isArray((rawData as { data: unknown }).data)) {
+    return (rawData as { data: DailyTransaction[] }).data;
+  }
+
+  return [];
 }
 
 export async function getLatestNews(ticker: string, limit = 18) {
